@@ -179,6 +179,8 @@ sudo systemctl status httpd
 
 
 Download WordPress and configure permissions:
+text
+
 
 mkdir wordpress && cd wordpress
 sudo wget http://wordpress.org/latest.tar.gz
@@ -194,8 +196,7 @@ text
 
 ---
 
-![WordPress Install](./screenshots/wordpress_installation.png)  
-*WordPress files ready in web directory*
+
 
 ---
 
