@@ -192,7 +192,8 @@ sudo chown -R apache:apache /var/www/html/wordpress
 sudo chcon -t httpd_sys_rw_content_t /var/www/html/wordpress -R
 sudo setsebool -P httpd_can_network_connect=1
 
-text
+<img width="1381" height="569" alt="image" src="https://github.com/user-attachments/assets/3ed88df5-bdab-4563-951c-49d39f6c445c" />
+
 
 ---
 
@@ -219,14 +220,17 @@ GRANT ALL ON wordpress.* TO 'myuser'@'<web-server-private-ip>';
 FLUSH PRIVILEGES;
 EXIT;
 
-text
 
 ---
 
 ## 🛠 Step 6 — Connect WordPress to Remote Database
 
 1. Open port `3306` restricted to web server IP on DB server’s security group.
-2. On web server, install MySQL client and test connection:
+
+<img width="1588" height="231" alt="image" src="https://github.com/user-attachments/assets/31c4e6be-0329-4cb6-abdb-e8cdafd02464" />
+
+
+3. On web server, install MySQL client and test connection:
 
 sudo yum install mysql -y
 mysql -u myuser -p -h <db-server-private-ip>
@@ -235,20 +239,34 @@ SHOW DATABASES;
 text
 
 3. Ensure HTTP (`80`) port open on web server.
-4. Access WordPress setup:
+
+<img width="1637" height="384" alt="image" src="https://github.com/user-attachments/assets/61b18f26-c37a-4fdc-8f3c-5a1c4c0f9a5e" />
+
+
+5. Access WordPress setup:
 
 http://<web-server-public-ip>/wordpress/
 
-text
+<img width="1838" height="824" alt="image" src="https://github.com/user-attachments/assets/3348932f-1d6c-4aeb-8c65-5569dbe2dec5" />
 
 Enter DB credentials and complete installation.
+
+
+Set up a customised wordpress site to demostrate the fuctionality 
+<img width="1873" height="979" alt="image" src="https://github.com/user-attachments/assets/0b808d47-024a-439c-8a27-53b108787607" />
 
 ---
 
 ## ⚠️ Important Notes
 
 - Stop EC2 instances after to avoid costs!
-- Replace all `<placeholders>` with your actual IPs/UUIDs.
+- Replace all with your actual IPs/UUIDs.
 - Security best practices: restrict access where possible.
+
+Troubleshooting 
+
+
+I used RedHat linux version 10 whic had a couuple of issues installing some of the tools like gdisk and mysql directly from the yum library.
+I also had a hard time connecting to the database from the sql site till properly configured the php file to allow connection for the database user and ip address in the wp-config.php file
 
 ---
