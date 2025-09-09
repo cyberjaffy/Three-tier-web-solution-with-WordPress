@@ -1,272 +1,495 @@
-text
-# 🚀 WordPress Three-Tier Architecture Deployment on AWS EC2 (RedHat)
+# Web-solution-with-Wordpress
 
----
+In this project, we will set up the infrastructure for a web solution using WordPress, a popular content management system. We will be using two separate Linux servers: one for the web server and another for the database server.
 
-## 📝 Overview
+## Project Overview
 
-This project demonstrates deploying a **WordPress CMS** on a **RedHat EC2 instance** connected to a remote **MySQL database** on a separate RedHat EC2 instance, implementing a classic **Three-Tier Architecture**:
+### The project consists of two main parts:
 
-- 🌐 **Presentation Layer:** Client browser accessing WordPress
-- 🏗️ **Business Layer:** WordPress running on RedHat web server EC2
-- 💾 **Data Access Layer:** MySQL running on RedHat database server EC2
+1. Configure storage subsystem for Web and Database servers: Gain hands-on experience with disks, partitions, and volumes on Linux.
+2. Install WordPress and connect it to a remote MySQL database server: Solidify your skills in deploying web and database tiers of a web solution.
 
-Additionally, the project applies **Linux disk partitioning** and **Logical Volume Management (LVM)** for optimized and resilient storage on both servers.
+## Three-tier Architecture:
 
----
+Generally, web, or mobile solutions are implemented based on what is called the Three-tier Architecture.
 
-## ⚙️ Prerequisites
+### Three-tier Architecture is a client-server software architecture pattern that comprise of 3 separate layers.
 
-Before you begin, ensure the following:
+  <img width="1061" height="642" alt="image" src="https://github.com/user-attachments/assets/9dc344a1-712f-4443-ada9-92ff14aeb5c2" />
 
-- AWS account with two RedHat EC2 instances running
-- SSH access configured via `ec2-user`
-- Security groups set to allow:
-  - SSH (port 22)
-  - HTTP (port 80) on web server
-  - MySQL (port 3306) on DB server limited to web server IP
 
----
+1. Presentation Layer (PL): This is the user interface such as the client server or browser on laptop.
+2. Business Layer (BL): This is the backend program that implements business logic. Application or Webserver.
+3. Data Access or Management Layer (DAL): This is the layer for data storage and data access. Database Server or File System Server such as FTP server, or NFS Server.
 
-## 🛠 Step 1 — Prepare the Web Server
+In this project, we will have the hands-on experience that showcases Three-tier Architecture while also ensuring that the disks used to store files on the Linux servers are adequately partitioned and managed through programs such as gdisk and LVM respectively.
 
-### 📦 Attach EBS Volumes & Partitioning
+### Our 3-Tier Setup Need:
 
-<img width="1455" height="460" alt="image" src="https://github.com/user-attachments/assets/0b08fa7e-48f2-4255-881e-63c041d78b30" />
+1. A Laptop or PC to serve as a client.
+2. An EC2 Linux Server as a web server (This is where you will install WordPress).
+3. An EC2 Linux server as a database (DB) server.
 
+We will Use RedHat OS for this project.
+By now we should know how to spin up an EC2 instanse on AWS, In previous projects we used 'Ubuntu', but it is better to be well-versed with various Linux distributions, thus, for this projects we will use very popular distribution called 'RedHat' (it also has a fully compatible derivative - CentOS)
 
-Identify block devices attached:
+#### Note: for Ubuntu server, when connecting to it via SSH/Putty or any other tool, we used ubuntu user, but for RedHat you will need to use ec2-user user. SSH connection will look like ec2-user@.
 
-lsblk
-df -h
 
-<img width="726" height="517" alt="image" src="https://github.com/user-attachments/assets/311e50a9-5a84-446e-80c8-4d9c2bfb3cc4" />
 
+## Step 1 - Prepare a Web Server
 
-Create partitions on each EBS volume using `gdisk`:
-Firstly Install gdisk (i use Red Hat Linux 10, so its a little different from version 8)
+1. Launch an EC2 instance that will serve as "Web Server" and Create 3 volumes in the same AZ as Web Server EC2, each of 10 GiB.
 
-Enable the CodeReady Linux Builder (CRB) Repository
-sudo subscription-manager repos --enable codeready-builder-for-rhel-10-$(arch)-rpms
+   <img width="1455" height="460" alt="image" src="https://github.com/user-attachments/assets/a66206a7-ac75-490a-aa67-b9faa19d935a" />
 
-Add the EPEL Repository
-sudo dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+3. Attach the three volumes one by one to your EC2 web server instance. You can do this from the AWS Management Console by selecting the instance and attaching the newly created volumes.
 
-Install gdisk
-sudo dnf install gdisk
+4. Connect to your instance via ssh
 
-sudo gdisk /dev/nvem1n1
+   ```
+   ssh -i <key-pair-name> ec2-user@<ip-address>
+   ```
 
+5. Check for the newly attached volumes. As seen above as /dev/xvdf, /dev/xvdg, and /dev/xvdh.
 
-![WhatsApp Image 2025-08-31 at 15 59 24_19e4440b](https://github.com/user-attachments/assets/98cc4bc1-219f-4811-a44b-4dd1c41144f7)
+   ```
+   ls /dev/
+   ```
 
+6. Check disk space:
 
-Commands inside gdisk:
-- n (new partition)
-- Accept defaults
-- Code: 8E00 (Linux LVM)
-- w (write changes)
-Repeat for /dev/xvdg and /dev/xvdh
-text
+   ```
+   df -h
+   ```
 
-### 💿 Setup LVM
+7. Partition the Disks: Use `gdisk` utility to create a single partition on each of the 3 disks.
 
-Install LVM tools:
+   ```
+   sudo gdisk /dev/xvdf
+   ```
 
-sudo yum install lvm2 -y
+8. Create a new partition:
+a) Type n to create a new partition. 
+b) Press Enter to select the default partition number 
+c) Press Enter to accept the default last sector. 
+d) Choose the partition type by typing 8300 for a Linux filesystem (ext4). 
+e) To Write changes to the disk, Once the partition is created, type w
 
-![WhatsApp Image 2025-08-31 at 16 03 49_b59e6a24](https://github.com/user-attachments/assets/44989d43-d8fe-40e6-a508-9c17f82d6066)
+9. Install lvm2 package using `sudo yum install lvm2`. Run sudo lvmdiskscan command to check for available partitions.
 
+   ```
+     sudo yum install lvm2 -y
+   ```
 
-Create physical volumes:
+10. Check available partitions with `lvmdiskscan`.
 
-sudo pvcreate /dev/nvme1n1p1 /dev/nvme2n1p1 /dev/nvme3n1p1
+    ```
+    sudo lvmdiskscan
+    ```
 
-![WhatsApp Image 2025-08-31 at 16 05 42_aff0d1e7](https://github.com/user-attachments/assets/a697d108-a073-4c4b-93d8-3b4e6bafcd3d)
+11. Create Physical Volumes by using `pvcreate` to mark the partitions as physical volumes:
 
+    ```
+    sudo pvcreate /dev/xvdf1
+    sudo pvcreate /dev/xvdg1
+    sudo pvcreate /dev/xvdh1
+    ```
 
-Create a volume group:
+12. Verify that Physical volume has been created successfully by running `sudo pvs`.
 
-sudo vgcreate webdata-vg /dev/nvme1n1p1 /dev/nvme2n1p1 /dev/nvme3n1p1
+    ```
+    sudo pvs
+    ```
 
-![WhatsApp Image 2025-08-31 at 16 10 02_0fabec8f](https://github.com/user-attachments/assets/96d814bd-e0bf-4455-b8da-2e54358f6b13)
+13. Create a Volume Group (VG): Add all three PVs to a volume group (VG) named webdata-vg:
 
+    ```
+    sudo vgcreate webdata-vg /dev/xvdf1 /dev/xvdg1 /dev/xvdh1
+    ```
 
-Create logical volumes for apps and logs:
+14. Verify that your VG has been created successfully by running:
 
-sudo lvcreate -n apps-lv -L 14G webdata-vg
-sudo lvcreate -n logs-lv -L 14G webdata-vg
+    ```
+     sudo vgs
+    ```
 
-![WhatsApp Image 2025-08-31 at 16 10 02_0fabec8f](https://github.com/user-attachments/assets/aeb400df-be16-4fef-a025-0e103b4f24b6)
+15. Create Logical Volumes (LVs): Create two logical volumes:
 
+    apps-lv using half of the VG size.
 
-Format logical volumes with ext4:
+    ```
+    sudo lvcreate -n apps-lv -L 14G webdata-vg
+    ```
 
-sudo mkfs.ext4 /dev/webdata-vg/apps-lv
-sudo mkfs.ext4 /dev/webdata-vg/logs-lv
+    logs-lv using the remaining space.
 
-text
+    ```
+    sudo lvcreate -n logs-lv -L 14G webdata-vg
+    ```
 
-Create mount points and mount volumes:
+16. Confirm logical volumes creation by running:
 
-sudo mkdir -p /var/www/html
-sudo mkdir -p /home/recovery/logs
-sudo mount /dev/webdata-vg/apps-lv /var/www/html
+    ```
+    sudo lvs
+    ```
 
-text
+17. Verify the entire setup
 
-Backup existing logs and mount logs volume:
+    ```
+    sudo vgdisplay -v 
+    sudo lsblk
+    ```
 
-sudo rsync -av /var/log/ /home/recovery/logs/
-sudo mount /dev/webdata-vg/logs-lv /var/log
-sudo rsync -av /home/recovery/logs/ /var/log
+18. Use mkfs.ext4 to format the logical volumes with ext4 filesystem
 
-![WhatsApp Image 2025-08-31 at 16 39 15_0dfa816a](https://github.com/user-attachments/assets/ec23170e-1b02-4370-a343-f094dbef6734)
+    ```
+    sudo mkfs -t ext4 /dev/webdata-vg/apps-lv
+    sudo mkfs -t ext4 /dev/webdata-vg/logs-lv
+    ```
+    
+19. Create directories for the web data and logs:
 
+    ```
+    sudo mkdir -p /var/www/html
+    sudo mkdir -p /home/recovery/logs
+    ```
 
-Make mounts persistent via `/etc/fstab`:
+20. Mount the logical volumes to the directories:
 
-sudo blkid
-sudo vi /etc/fstab
+    ```
+    sudo mount /dev/webdata-vg/apps-lv /var/www/html/
+    sudo rsync -av /var/log/ /home/recovery/logs/
+    sudo mount /dev/webdata-vg/logs-lv /var/log
+    sudo rsync -av /home/recovery/logs/ /var/log
+    ```
 
-Add lines (replace UUIDs with your device UUIDs):
-UUID=<UUID_apps-lv> /var/www/html ext4 defaults 0 2
-UUID=<UUID_logs-lv> /var/log ext4 defaults 0 2
+21. Update /etc/fstab so that the mount configuration persists after a server reboot:
 
-![WhatsApp Image 2025-08-31 at 16 44 15_a6f57a1d](https://github.com/user-attachments/assets/008b57da-d001-4f6e-b385-11299486de30)
+    ```
+    sudo blkid
+    sudo vi /etc/fstab
+    ```
+   <img width="726" height="517" alt="image" src="https://github.com/user-attachments/assets/afc019f9-3ec6-47a3-9cef-e52440c1bf8b" />
 
+<img width="915" height="722" alt="image" src="https://github.com/user-attachments/assets/bbcdeec3-a3f1-426f-80cb-1fc3a9aaa87f" />
 
-Test mounts and reload daemon:
+<img width="857" height="376" alt="image" src="https://github.com/user-attachments/assets/3a23688a-67a6-4684-b003-31bc7abd1cc9" />
 
-sudo mount -a
-sudo systemctl daemon-reload
-df -h
+<img width="475" height="135" alt="image" src="https://github.com/user-attachments/assets/5f72129e-6396-4b4a-8910-c35eff052fa1" />
 
-![WhatsApp Image 2025-08-31 at 16 45 06_6a583ba2](https://github.com/user-attachments/assets/58eed98f-5d34-4614-9413-cae20f4fb5d0)
+<img width="922" height="278" alt="image" src="https://github.com/user-attachments/assets/d00e3837-654c-4651-a1ec-ab85ea73b7e9" />
 
+<img width="922" height="278" alt="image" src="https://github.com/user-attachments/assets/dfa79e28-4793-45b4-9c51-c5f00a406195" />
 
----
+<img width="736" height="571" alt="image" src="https://github.com/user-attachments/assets/91948345-1b61-4f66-ae6c-53f72926cec2" />
 
+<img width="945" height="246" alt="image" src="https://github.com/user-attachments/assets/cfb48945-360f-4e93-af3d-4b4e10e6a270" />
 
----
 
-## 🛠 Step 2 — Prepare the Database Server
 
-Repeat the above steps to configure LVM storage on the DB server. Create a logical volume `db-lv` mounted at `/db`.
+23. Verify that the setup is successful:
 
----
+    ```
+    sudo mount -a
+    sudo systemctl daemon-reload
+    df -h
+    ```
+<img width="883" height="281" alt="image" src="https://github.com/user-attachments/assets/dbf4def8-3702-4eb4-b1f6-2bc89ff2c246" />
 
-## 🛠 Step 3 — Install WordPress on Web Server
 
-Update system and install required packages:
 
-sudo yum -y update
-sudo yum -y install wget httpd php php-mysqlnd php-fpm php-json
-sudo systemctl enable httpd --now
-sudo yum install epel-release yum-utils -y
-sudo yum install http://rpms.remirepo.net/enterprise/remi-release-8.rpm -y
+## Step 2 - Prepare the Database Server
 
-sudo yum module reset php -y
-sudo yum module enable php:remi-7.4 -y
-sudo yum install php php-opcache php-gd php-curl php-mysqlnd -y
+Launch a second RedHat EC2 instance that will have a role - 'DB Server' Repeat the same steps as for the Web Server, but instead of apps-lv create db-lv and mount it to /db directory instead of /var/www/html/.
+Repeat the whole process for the webserver but instead of apps-lv, use db-lv and mount it to /db directory instead of /var/www/html/.
 
-sudo systemctl enable php-fpm --now
-sudo setsebool -P httpd_execmem 1
-sudo systemctl restart httpd
-sudo systemctl status httpd
+## Step 3 - Install Wordpress on your webserver.
 
-<img width="1306" height="432" alt="image" src="https://github.com/user-attachments/assets/30b1f598-54d8-400f-8cea-03698a749bc3" />
+1. Update the package repository:
 
+   ```
+   sudo yum -y update
+   ```
 
-Download WordPress and configure permissions:
-text
+2. Install required packages:
 
+   ```
+    sudo yum -y install wget httpd php php-mysqlnd php-fpm php-json
+   ```
 
-mkdir wordpress && cd wordpress
-sudo wget http://wordpress.org/latest.tar.gz
-sudo tar -xzvf latest.tar.gz
-sudo rm -f latest.tar.gz
-sudo cp wordpress/wp-config-sample.php wordpress/wp-config.php
-sudo cp -r wordpress /var/www/html/
-sudo chown -R apache:apache /var/www/html/wordpress
-sudo chcon -t httpd_sys_rw_content_t /var/www/html/wordpress -R
-sudo setsebool -P httpd_can_network_connect=1
+3. Enable and start the Apache web server:
 
-<img width="1381" height="569" alt="image" src="https://github.com/user-attachments/assets/3ed88df5-bdab-4563-951c-49d39f6c445c" />
+   ```
+   sudo systemctl enable httpd
+   sudo systemctl start httpd
+   ```
 
+<img width="1306" height="432" alt="image" src="https://github.com/user-attachments/assets/2f77ef53-ad77-49f9-bde0-1a55ae7f63c6" />
 
----
 
+4. Install additional PHP dependencies:
 
+   ```
+   sudo yum install https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+   sudo yum install yum-utils http://rpms.remirepo.net/enterprise/remi-release-8.rpm
+   sudo yum module list php
+   sudo yum module reset php
+   sudo yum module enable php:remi-7.4
+   sudo yum install php php-opcache php-gd php-curl php-mysqlnd
+   sudo systemctl start php-fpm
+   sudo systemctl enable php-fpm
+   ```
 
----
+5. Allow Apache to execute PHP code:
 
-## 🛠 Step 4 — Install MySQL on DB Server
+   ```
+   sudo setsebool -P httpd_execmem 1
+   sudo systemctl restart httpd
+   ```
 
-sudo yum update -y
-sudo yum install mysql-server -y
-sudo systemctl enable mysqld --now
+6. Download and install WordPress:
 
-text
+   ```
+   mkdir wordpress
+   cd wordpress
+   sudo wget http://wordpress.org/latest.tar.gz
+   sudo tar -xzvf latest.tar.gz
+   sudo rm -rf latest.tar.gz
+   ```
+<img width="1381" height="569" alt="image" src="https://github.com/user-attachments/assets/9151391f-3ba5-4b95-8f53-7478224c77ea" />
 
----
 
-## 🛠 Step 5 — Configure Database for WordPress
+7. Copy the Configuration File: WordPress comes with a sample configuration file that you need to copy and rename. This file will be used to configure your database settings.
 
-sudo mysql
-CREATE DATABASE wordpress;
-CREATE USER 'myuser'@'<web-server-private-ip>' IDENTIFIED BY 'mypass';
-GRANT ALL ON wordpress.* TO 'myuser'@'<web-server-private-ip>';
-FLUSH PRIVILEGES;
-EXIT;
+   ```
+   sudo cp wordpress/wp-config-sample.php wordpress/wp-config.php
+   ```
 
+8. Move WordPress Files to the Web Root Directory: Finally, copy the entire WordPress directory into the web server’s root directory, which is typically located at /var/www/html/.
 
----
+   ```
+   sudo cp -R wordpress /var/www/html/
+   ```
 
-## 🛠 Step 6 — Connect WordPress to Remote Database
+9. Change Ownership of the WordPress Directory
 
-1. Open port `3306` restricted to web server IP on DB server’s security group.
+    ```
+    sudo chown -R apache:apache /var/www/html/wordpress
+    ```
 
-<img width="1588" height="231" alt="image" src="https://github.com/user-attachments/assets/31c4e6be-0329-4cb6-abdb-e8cdafd02464" />
+10. Configure SELinux Context for WordPress Directory
 
+    ```
+    sudo chcon -t httpd_sys_rw_content_t /var/www/html/wordpress -R
+    ```
 
-3. On web server, install MySQL client and test connection:
+11. Allow Apache to Connect to the Network
 
-sudo yum install mysql -y
-mysql -u myuser -p -h <db-server-private-ip>
-SHOW DATABASES;
+    ```
+    sudo setsebool -P httpd_can_network_connect=1
+    ```
 
-text
 
-3. Ensure HTTP (`80`) port open on web server.
 
-<img width="1637" height="384" alt="image" src="https://github.com/user-attachments/assets/61b18f26-c37a-4fdc-8f3c-5a1c4c0f9a5e" />
 
+## Step 4 - Install MySQL on the DB Ec2 Server.
 
-5. Access WordPress setup:
+1. Install MySQL Server:
 
-http://<web-server-public-ip>/wordpress/
+   ```
+   sudo yum update
+   sudo yum install mysql-server
+   ```
 
-<img width="1838" height="824" alt="image" src="https://github.com/user-attachments/assets/3348932f-1d6c-4aeb-8c65-5569dbe2dec5" />
+2. Enable and start the MySQL service:
 
-Enter DB credentials and complete installation.
+   ```
+   sudo systemctl enable mysqld
+   sudo systemctl start mysqld
+   ```
 
+3. Check if MySQL is running:
 
-Set up a customised wordpress site to demostrate the fuctionality 
-<img width="1873" height="979" alt="image" src="https://github.com/user-attachments/assets/0b808d47-024a-439c-8a27-53b108787607" />
+   ```
+   sudo systemctl status mysqld
+   ```
 
----
+   
+## Step 5 - Configure the DB for wordpress
 
-## ⚠️ Important Notes
+1. Login to MySQL:
 
-- Stop EC2 instances after to avoid costs!
-- Replace all with your actual IPs/UUIDs.
-- Security best practices: restrict access where possible.
+   ```
+   sudo mysql
+   ```
 
-Troubleshooting 
+2. Create the WordPress database and a user for the web server:
 
+   ```
+   CREATE DATABASE wordpress;
+   CREATE USER `myuser`@`<Web-Server-Private-IP-Address>` IDENTIFIED BY '<your-password>';
+   GRANT ALL ON wordpress.* TO 'myuser'@'<Web-Server-Private-IP-Address>';
+   FLUSH PRIVILEGES;
+   SHOW DATABASES;
+   exit;
+   ```
 
-I used RedHat linux version 10 whic had a couuple of issues installing some of the tools like gdisk and mysql directly from the yum library.
-I also had a hard time connecting to the database from the sql site till properly configured the php file to allow connection for the database user and ip address in the wp-config.php file
+   
 
----
+3. Modify the inbound rules for the DB server security group to allow MySQL connections (port 3306) only from the Web Server's private IP. For extra security, restrict access using /32 CIDR notation.
+
+
+   <img width="1588" height="231" alt="image" src="https://github.com/user-attachments/assets/84acab54-6390-41be-9989-b5b8c37609dc" />
+
+
+<img width="1637" height="384" alt="image" src="https://github.com/user-attachments/assets/bd91693b-8798-429b-a6b4-a22b905bcf42" />
+
+   
+## Step 6 - Configure WordPress to Connect to the Remote Database
+
+1. Install the MySQL client on the Web Server:
+
+   ```
+   sudo yum install mysql
+   ```
+
+2. Test if the Web Server can connect to the remote DB server:
+
+   ```
+   sudo mysql -u myuser -p -h <DB-Server-Private-IP-Address>
+   ```
+
+3. Verify the connection:
+
+    ```
+    SHOW DATABASES;
+    ```
+
+  
+    
+4. Edit the wp-config.php file located in /var/www/html/wordpress to include the database credentials using:
+
+   ```
+   sudo vi /var/www/html/wordpress/wp-config.php
+   ```
+
+5. Input the following:
+
+   ```
+      define('DB_NAME', 'wordpress');
+      define('DB_USER', 'myuser');
+      define('DB_PASSWORD', 'mypass.1');
+      define('DB_HOST', '<DB-Server-Private-IP-Address>');
+   ```
+      
+6. Access WordPress Setup from a Browser:
+
+   ```
+   http://<Web-Server-Public-IP-Address>/wordpress/
+   ```
+
+  <img width="1838" height="824" alt="image" src="https://github.com/user-attachments/assets/21675d33-2617-4749-990d-f82cfd1f4ddc" />
+
+
+7. Follow the on-screen instructions to complete the WordPress setup:
+  
+  <img width="1873" height="979" alt="image" src="https://github.com/user-attachments/assets/5954a6aa-b375-4226-8276-4b59339c7a0e" />
+
+
+   
+
+# CONCLUSION
+
+This project demonstrates the successful implementation of a scalable and robust web solution using WordPress, the world's most popular content management system. By leveraging Amazon Web Services (AWS) EC2 instances, we've created a flexible and powerful hosting environment for WordPress.
+
+## Key Achievements
+
+1. **Successful Setup of Three-Tier Architecture**:
+   - Configured a web server, application server, and database server for a robust application environment.
+
+2. **Efficient Storage Management**:
+   - Implemented Logical Volume Management (LVM) for flexible and scalable storage, allowing for easy resizing and management of disk space.
+
+3. **Deployment of WordPress**:
+   - Installed and configured WordPress as a content management system, showcasing the ability to create and manage web applications.
+
+4. **Partitioning and Volume Group Creation**:
+   - Successfully partitioned block instances and created volume groups to optimize storage utilization.
+
+5. **Error Handling and Troubleshooting**:
+   - Developed problem-solving skills by overcoming various challenges during the setup process, such as configuration issues and permissions errors.
+
+6. **Documentation and Version Control**:
+   - Documented the entire process on GitHub, enhancing skills in version control and providing a reference for future projects.
+
+
+## Likely Errors and Solutions
+
+1. **Error: “Error establishing a database connection”**
+   - **Cause**: This can occur due to incorrect database credentials, database service not running, or network issues.
+   - **Solution**: 
+     - Verify database credentials in the `wp-config.php` file.
+     - Check if the MySQL/MariaDB service is running using `sudo systemctl status mysql` or `sudo systemctl status mariadb`.
+     - Ensure that the security group settings in AWS allow traffic on port 3306.
+
+2. **Error: “Failed to start mysql.service: Unit mysql.service not found”**
+   - **Cause**: MySQL may not be installed or the service may not be configured correctly.
+   - **Solution**: 
+     - Install MySQL using the appropriate package manager (`yum install mysql-server` for RedHat).
+     - Ensure the service is enabled and started with `sudo systemctl enable mysql` and `sudo systemctl start mysql`.
+
+3. **Error: “Access denied for user 'root'@'localhost'”**
+   - **Cause**: Incorrect password or user permissions.
+   - **Solution**: 
+     - Reset the root password using the command line by starting MySQL in safe mode.
+     - Grant appropriate permissions to the user by executing the necessary GRANT commands after logging in.
+
+4. **Error: “Physical volume is already in volume group”**
+   - **Cause**: Attempting to add an existing physical volume to a volume group.
+   - **Solution**: 
+     - Use the `vgreduce` command to remove the volume from the group if necessary or check the existing configuration with `vgs` and `pvs` to ensure the correct volumes are being used.
+
+5. **Error: “Command not found” when using `apt` or `yum`**
+   - **Cause**: The package manager may not be installed or recognized due to system misconfiguration.
+   - **Solution**: 
+     - Ensure you are using the correct package manager for your distribution (e.g., `yum` for RedHat).
+     - Check the system’s PATH variable and configuration to ensure proper setup.
+
+6. **Error: “Insufficient storage space” when creating logical volumes**
+   - **Cause**: Not enough free space in the volume group to allocate to a new logical volume.
+   - **Solution**: 
+     - Check available space using `vgs` or `lvs`.
+     - Consider resizing existing volumes or adding more physical volumes to the volume group.
+
+
+### By documenting these achievements and challenges, I am not tracking just my progress but also creating a valuable resource for others who may encounter similar issues. 
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
